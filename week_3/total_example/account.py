@@ -18,4 +18,5 @@ class Account:
 
 class SavingsAccount(Account):
     def add_interest(self, rate):
-        self.balance += self.balance * rate
+        interest = self.balance * rate
+        self.deposit(interest)
