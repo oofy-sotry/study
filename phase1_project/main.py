@@ -32,7 +32,7 @@ def main():
                 if account_type == "1":
                     acc = Account(name, next_account_number, balance)
                 elif account_type == "2":
-                    acc = SavingsAccount(name, next_account_number_balance)
+                    acc = SavingsAccount(name, next_account_number, balance)
                 else:
                     print("잘못된 선택입니다.")
                     continue
@@ -93,3 +93,7 @@ def main():
 
         except ValueError as e:
             print("오류:", e)
+
+
+if __name__ == "__main__":
+    main()
