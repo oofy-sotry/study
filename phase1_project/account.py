@@ -18,7 +18,7 @@ class Account:
         return self.balance
 
     def __str__(self):
-        return f"{self.owner}님의 잔액: {self.balance}"
+        return f"[{self.account_number}] {self.owner}님의 잔액: {self.balance}"
 
 class SavingsAccount(Account):
     def add_interest(self, rate):
