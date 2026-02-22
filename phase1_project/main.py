@@ -91,6 +91,10 @@ def main():
                 print("프로그램 종료")
                 break
 
+            else:
+                print("올바른 번호를 입력해주세요")
+
+
         except ValueError as e:
             print("오류:", e)
 
