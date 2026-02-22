@@ -73,6 +73,19 @@ def main():
                 else:
                     print("해당 계좌가 없습니다")
                                 
+            elif choice == "5":
+                account_number = int(input("계좌 번호 : "))
+                acc = find_account(account_number)
+
+                if not acc:
+                    print("해당 계좌가 없습니다")
+                elif isinstance(acc, SavingsAccount):
+                    rate = float(input("이자율 입력 (예: 0.05): "))
+                    acc.add_interest(rate)
+                    print("이자 추가 완료")
+                    print(acc)
+                else:
+                    print("저축계좌만 해당합니다")
 
         except ValueError as e:
             print("오류:", e)
