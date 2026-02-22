@@ -14,4 +14,5 @@ class Account:
                 raise ValueError("잔액이 부족합니다")
             self.balance -= amount
 
-
+    def get_balance(self):
+        return self.balance
