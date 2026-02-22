@@ -49,5 +49,19 @@ def main():
                 else:
                     for acc in accounts:
                         print(acc)
+
+            elif choice == "3":
+                account_number = int(input("계좌 번호: "))
+                acc = find_account(account_number)
+
+                if acc:
+                    amount = float(input("입금 금액: "))
+                    acc.deposit(amount)
+                    print("입금 완료")
+                else:
+                    print("해당 계좌가 없습니다")
+
+
+
         except ValueError as e:
             print("오류:", e)
