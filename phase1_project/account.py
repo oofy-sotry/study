@@ -24,5 +24,7 @@ class Account:
 
 class SavingsAccount(Account):
     def add_interest(self, rate):
+        if rate <= 0:
+            raise ValueError("이율은 0보다 커야 합니다")
         interest = self.balance * rate
         self.deposit(interest)
