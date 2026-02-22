@@ -61,7 +61,18 @@ def main():
                 else:
                     print("해당 계좌가 없습니다")
 
+            elif choice == "4":
+                account_number = int(input("계좌 번호: "))
+                acc = find_account(account_number)
 
+                if acc:
+                    amount = float(input("출금 금액: "))
+                    acc.withdrwa(amount)
+                    print("출금 완료")
+                    print(acc)
+                else:
+                    print("해당 계좌가 없습니다")
+                                
 
         except ValueError as e:
             print("오류:", e)
