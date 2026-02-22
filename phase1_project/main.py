@@ -43,5 +43,11 @@ def main():
                 print("계좌 생성 완료")
                 print(acc)
 
+            elif choice == "2":
+                if not accounts:
+                    print("등록된 계좌가 없습니다")
+                else:
+                    for acc in accounts:
+                        print(acc)
         except ValueError as e:
             print("오류:", e)
