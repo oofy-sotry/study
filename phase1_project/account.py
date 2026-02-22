@@ -16,3 +16,6 @@ class Account:
 
     def get_balance(self):
         return self.balance
+
+    def __str__(self):
+        return f"{self.owner}님의 잔액: {self.balance}"
