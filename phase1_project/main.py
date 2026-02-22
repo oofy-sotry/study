@@ -87,5 +87,9 @@ def main():
                 else:
                     print("저축계좌만 해당합니다")
 
+            elif choice == "0":
+                print("프로그램 종료")
+                break
+
         except ValueError as e:
             print("오류:", e)
