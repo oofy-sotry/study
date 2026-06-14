@@ -1,0 +1,792 @@
+2. 퍼셉트론
+  - 다수의 신호를 입력으로 받아 하나의 신호를 출력하는것
+    *신호란? 전류나 강물처럼 흐르는 무언가
+
+  - 뉴런(노드) = 입력값 또는 출력값을 담는 단위
+  - 가중치 = 각 입력이 출력에 얼마나 영향을 주는지의 비중                                                                                                                                      
+  - 임곗값(θ) = 뉴런이 1을 출력할지 0을 출력할지 결정하는 문턱값  
+
+  - 편향 = 뉴런이 얼마나 쉽게 활성화(1 출력)되는지를 조정하는 값 
+    * -θ = b
+
+
+3. 신경망
+  - 활성화 함수
+    - 입력 신호의 총합을 출력 신호로 변환하는 함수
+    - 활성화 함수의 종류 중 하나가 "계단 함수"
+      -> 계단 함수: 임곗값을 경계로 출력이 0 또는 1로 변환되는 함수
+    - 퍼셉트론에서는 활성화 함수로 계단 함수를 이용함             
+
+  - 시그모이드 함수
+    - 신경망에서 자주 사용되는 활성화 함수
+    - h(x) = 1 / (1 + exp(-x))
+      - exp(-x)의 역할은 어떤 실수 x가 들어와도 출력을 0~1 사이로 압축하기 위한 장치
+        - x가 매우 큰 양수 : exp(-x) → 0  →  1 / (1+0) = 1
+        - x = 0           : exp(-x) = 1  →  1 / (1+1) = 0.5
+        - x가 매우 큰 음수 : exp(-x) → ∞  →  1 / (1+∞) = 0
+
+  - 계단 함수 vs 시그모이드 함수
+    - 계단 함수: 0 또는 1만 출력 (불연속)
+    - 시그모이드: 0~1 사이 연속적인 값 출력
+      -> 연속적이기 때문에 미분이 가능 => 역전파(backpropagation) 학습이 가능해짐
+      -> 계단 함수는 미분값이 거의 0이라 학습에 사용 불가
+
+  - 3층 신경망 구조
+    - 입력층 → 은닉층1 → 은닉층2 → 출력층
+    - 각 층은 아래 두 단계로 계산됨
+      * a (가중합) = 입력 · 가중치(W) + 편향(b)   <- 활성화 함수 적용 전
+      * z (활성화) = 활성화 함수(a)               <- 활성화 함수 적용 후
+    - 은닉층 활성화 함수: 시그모이드
+    - 출력층 활성화 함수: 항등 함수 (입력을 그대로 출력, 회귀 문제에 사용)
+      -> 분류 문제라면 출력층에 소프트맥스(softmax)를 사용
+
+  - 순전파 (forward propagation)
+    - 입력에서 출력 방향으로 신호를 전달하는 과정
+    - 행렬 곱(np.dot)으로 구현: 입력 × 가중치를 층마다 반복
+
+  - 항등 함수
+    - 입력을 그대로 출력 -> 입력과 출력이 항상 같다
+
+  - 소프트맥스 함수
+    - 분류 문제의 출력층에서 사용하는 활성화 함수
+    - h(ak) = exp(ak) / Σexp(ai)  (분자: k번째 출력의 지수, 분모: 모든 출력의 지수 합)
+    - 출력값의 합이 항상 1.0 => 각 출력값을 확률로 해석 가능
+    - 오버플로우 문제
+      -> exp()는 값이 매우 커질 수 있어 무한대(inf)가 될 위험이 있음
+      -> 해결: 입력에서 최댓값(c)을 빼줌 => 수학적으로 결과는 동일하지만 수치가 안정됨
+      -> softmax(x) = exp(x - c) / Σexp(x - c)
+
+  - 전처리 (pre-processing)
+    - 신경망에 데이터를 입력하기 전에 데이터를 가공하는 작업
+    - 종류
+      * 정규화(normalize): 데이터의 범위를 일정한 범위로 변환
+        -> MNIST 예시: 픽셀값 0~255 → 0.0~1.0 (÷255)
+        -> 값의 범위가 크면 학습이 불안정해지므로 범위를 통일함
+      * 백색화(whitening): 데이터의 분포를 균일하게 만드는 작업
+      * flatten: 다차원 데이터를 1차원으로 펼침
+        -> MNIST 예시: 28×28 2차원 → 784짜리 1차원 배열
+
+  - 손글씨 숫자 인식 (MNIST)
+    - MNIST = 손글씨 숫자 이미지 데이터셋
+      * 훈련 데이터: 60,000장 / 테스트 데이터: 10,000장
+      * 이미지 크기: 28×28 픽셀 = 784개의 픽셀값
+      * 레이블: 0~9 (총 10가지 숫자)
+    - 정규화(normalize): 픽셀값 0~255 → 0.0~1.0 으로 변환
+      -> 값의 범위를 통일해 학습을 안정적으로 만들기 위함
+    - flatten: 28×28 2차원 이미지 → 784짜리 1차원 배열로 펼침
+
+  - 신경망의 추론 처리
+    - 입력(784) → 은닉층1(50) → 은닉층2(100) → 출력층(10)
+    - 출력층 뉴런이 10개인 이유: 숫자 0~9, 총 10가지 분류
+    - 소프트맥스 출력값 중 가장 큰 인덱스 = 예측 숫자 (np.argmax)
+    - 실습 결과 정확도: 93.52%
+
+  - 배치 처리 (batch)
+    - 이미지를 1장씩 처리하지 않고 여러 장을 묶어 한 번에 처리 -> 즉, 하나로 묶은 입력 데이터를 배치라고 함
+    - 입력 shape: 1장 (784,) → 100장 배치 (100, 784)
+    - 행렬 곱으로 한 번에 계산하므로 속도가 훨씬 빠름
+
+
+4. 신경망 학습
+  - 학습 : 훈련 데이터로부터 가중치 매개변수의 최적값을 자동으로 획득하는 것
+  
+  - 범용 능력을 제대로 평가하기 위해서는 훈련 데이터와 시험 데이터를 분리해야함
+    - 범용 능력이란? 훈련 데이터에 포함되지 않은 데이터로도 문제를 풀 수 있는 능력
+    - 과대적합 : 한 데이터셋에만 지나치게 최적화된 상태
+
+  - 손실 함수 : 신경망 성능의 나쁨을 나타내는 지표로, 현재의 신경망이 훈련 데이터를 얼마나 잘 처리하지 못하느냐를 나타내는 함수  
+    - 오차제곱합 (SSE, Sum of Squared Error)
+      - 손실 함수의 한 종류
+      - E = ½ Σ(yk - tk)²
+        * yk: 신경망 출력값 (예측)
+        * tk: 정답 레이블
+        * ½ 는 미분 계산을 편리하게 하기 위해 붙이는 상수
+      - 오차가 클수록 값이 커짐 => 손실 함수 값이 작을수록 좋은 신경망
+
+      - 원-핫 인코딩 : 정답에 해당하는 인덱스만 1, 나머지는 0으로 표현하는 방식
+        -> 예: 숫자 2 → [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]
+        -> 오차제곱합 계산 시 정답 인덱스(1인 곳)와 예측값의 차이만 실질적으로 반영됨
+
+    - 교차 엔트로피 오차 (CEE, Cross Entropy Error)
+      - 손실 함수의 한 종류
+      - E = -Σ tk * log(yk)
+        * yk: 신경망 출력값 (예측 확률)
+        * tk: 정답 레이블 (원-핫 인코딩)
+      - 원-핫 인코딩에서 tk=1인 정답 인덱스의 log(yk)만 실질적으로 계산됨
+        -> 정답일 확률이 낮을수록 log 값이 커져 손실이 기하급수적으로 커짐
+      - log(0) = -inf 문제 방지를 위해 아주 작은 값(delta = 1e-7)을 더해줌
+
+  - 미니배치 학습
+    - 훈련 데이터 전체가 아닌 일부를 무작위로 뽑아 학습하는 방식
+      -> 전체 데이터로 손실을 계산하면 데이터가 많을수록 시간이 너무 오래 걸림
+    - np.random.choice(전체 크기, 배치 크기) 로 무작위 인덱스를 추출
+      -> 예: np.random.choice(60000, 10) → 0~59999 중 10개를 무작위 추출
+    - 미니배치용 CEE는 합이 아닌 평균으로 계산
+      -> 배치 크기가 달라도 손실값을 동일한 기준으로 비교하기 위함
+      -> E = -Σ tk * log(yk) / 배치 크기
+
+  - 교차 엔트로피 오차 구현하기
+    - 단일 데이터 CEE 구현
+      def cross_entropy_error(y, t):
+          delta = 1e-7
+          return -np.sum(t * np.log(y + delta))
+      * delta = 1e-7 : log(0) = -inf가 되는 것을 막기 위해 아주 작은 값을 더함
+      * t * np.log(y + delta) : 원-핫 인코딩이므로 tk=1인 정답 인덱스의 값만 남음
+
+    - 배치용 CEE 구현
+      def cross_entropy_error_batch(y, t):
+          if y.ndim == 1:
+              t = t.reshape(1, t.size)
+              y = y.reshape(1, y.size)
+          batch_size = y.shape[0]
+          delta = 1e-7
+          return -np.sum(t * np.log(y + delta)) / batch_size
+      * / batch_size : 합이 아닌 평균으로 계산
+        -> 배치 크기가 달라도 손실값을 동일한 기준으로 비교하기 위함
+
+  - 왜 손실 함수를 설정하는가?
+    - 정확도라는 지표를 놔두고 손실 함수의 값이라는 우회적인 방법을 택하는 이유는 무엇인가?
+      - 정확도를 지표로 하면 매개변수의 미분이 대부분의 장소에서 0이 되기 때문
+        -> 매개변수를 조금 바꿔도 정확도는 거의 변하지 않고, 변한다 해도 불연속적으로 바뀜
+        -> 미분값이 0이 되면 가중치를 어느 방향으로 얼마나 바꿔야 할지 알 수 없어 학습 불가
+      - 손실 함수는 연속적이고 매끄럽게 변하므로 미분값이 0이 되지 않아 학습에 사용 가능
+        -> 활성화 함수로 계단 함수 대신 시그모이드를 쓰는 이유와 같은 맥락
+
+  - 수치 미분 : 아주 작은 h 값을 이용해 미분을 근사치로 계산하는 방법
+    - 미분 : 특정 순간의 변화량 (= 기울기, 순간 변화율)
+      - df(x)/dx = lim(h→0) (f(x+h) - f(x)) / h
+        * h를 한없이 0에 가깝게 했을 때, f(x)의 변화량
+    - 해석적 미분(수식으로 정확히 구하는 방법)의 대안
+      -> 오차가 존재하지만, 신경망 학습에서는 충분히 유효함
+
+    - 전진 차분 vs 중앙 차분
+      - 전진 차분 : (f(x+h) - f(x)) / h
+        -> 문제: x에서의 미분이 아닌, x와 x+h 사이의 기울기를 구하게 됨 => 오차 발생
+      - 중앙 차분 : (f(x+h) - f(x-h)) / 2h
+        -> x를 중심으로 좌우 h씩 떨어진 두 점의 기울기를 구함
+        -> 전진 차분보다 오차가 훨씬 적음 => 수치 미분 구현 시 기본으로 사용
+
+    - h 값 주의사항
+      -> h를 너무 작게 하면 라운딩 오류(rounding error) 발생
+         예: h=1e-50 이면 부동소수점 정밀도 한계로 f(x+h) - f(x-h) = 0 이 됨
+      -> 적절한 값: h = 1e-4 (0.0001)
+
+    - 수치 미분 구현
+      def numerical_diff(f, x):
+          h = 1e-4
+          return (f(x+h) - f(x-h)) / (2*h)
+      * 중앙 차분 방식으로 구현
+
+    - 수치 미분 예시 (y = 0.01x² + 0.1x)
+      def function_1(x):
+          return 0.01*x**2 + 0.1*x
+
+      print(numerical_diff(function_1, 5))   # 약 0.2 (해석적 미분: 2*0.01*5 + 0.1 = 0.2)
+      print(numerical_diff(function_1, 10))  # 약 0.3 (해석적 미분: 2*0.01*10 + 0.1 = 0.3)
+      * 수치 미분 결과와 해석적 미분 결과가 거의 일치함
+
+  - 편미분 : 변수가 여러 개인 함수에서 특정 하나의 변수에 대해서만 미분하는 것
+    - 나머지 변수는 상수로 고정한 채 하나의 변수만 미분
+    - 표기: ∂f/∂x0 (x0에 대한 편미분), ∂f/∂x1 (x1에 대한 편미분)
+
+    - 예시 함수 : f(x0, x1) = x0² + x1²
+      - x0에 대한 편미분 : ∂f/∂x0 = 2x0  (x1은 상수 취급 => 사라짐)
+      - x1에 대한 편미분 : ∂f/∂x1 = 2x1  (x0는 상수 취급 => 사라짐)
+
+    - 수치 미분으로 편미분 구하기
+      - 편미분하려는 변수 하나만 바꾸고, 나머지는 고정한 채 numerical_diff 호출
+      - x0=3, x1=4 에서의 편미분 예시
+        -> x0에 대한 편미분: x1=4.0으로 고정, x0만 변화
+           def function_tmp1(x0):
+               return x0**2 + 4.0**2
+           numerical_diff(function_tmp1, 3.0)   # 약 6.0 (해석적 미분: 2*3 = 6)
+
+        -> x1에 대한 편미분: x0=3.0으로 고정, x1만 변화
+           def function_tmp2(x1):
+               return 3.0**2 + x1**2
+           numerical_diff(function_tmp2, 4.0)   # 약 8.0 (해석적 미분: 2*4 = 8)
+
+  - 기울기 (gradient) : 모든 변수의 편미분을 벡터로 정리한 것
+    - ∇f = (∂f/∂x0, ∂f/∂x1)
+      * 편미분을 하나씩 따로 구했던 것을 한 번에 묶어서 표현
+
+    - numerical_gradient 구현
+      - numpy 배열 x의 각 원소에 대해 순서대로 편미분을 계산
+      - 한 원소씩 h만큼 바꾸고 나머지는 그대로 유지 => 편미분과 동일한 원리
+      def numerical_gradient(f, x):
+          h = 1e-4
+          grad = np.zeros_like(x)       # x와 같은 shape의 0 배열 생성
+          for i in range(x.size):
+              tmp_val = x[i]
+              x[i] = tmp_val + h
+              fxh1 = f(x)               # f(x+h)
+              x[i] = tmp_val - h
+              fxh2 = f(x)               # f(x-h)
+              grad[i] = (fxh1 - fxh2) / (2*h)
+              x[i] = tmp_val            # 원래 값으로 복원
+          return grad
+
+    - 기울기 계산 예시 (f(x0, x1) = x0² + x1²)
+      numerical_gradient(function_2, np.array([3.0, 4.0]))  # [6.0, 8.0]
+      numerical_gradient(function_2, np.array([0.0, 2.0]))  # [0.0, 4.0]
+      numerical_gradient(function_2, np.array([3.0, 0.0]))  # [6.0, 0.0]
+
+    - 기울기가 가리키는 방향
+      - 각 점에서 함수값이 가장 가파르게 증가하는 방향
+      - 기울기의 반대 방향 = 함수값이 가장 가파르게 감소하는 방향
+        -> 손실 함수를 줄이려면 기울기의 반대 방향으로 이동 => 경사하강법의 원리
+
+  - 경사하강법 (gradient descent) : 기울기를 이용해 함수의 최솟값을 찾는 방법
+    - 현재 위치에서 기울기의 반대 방향으로 조금씩 이동을 반복
+    - 수식 : x ← x - η * ∂f/∂x
+      * η (에타) : 학습률 (learning rate) — 한 번에 얼마나 이동할지 결정하는 값
+
+    - 학습률(η) 선택의 중요성
+      - 너무 크면 : 최솟값을 지나쳐 발산할 수 있음
+      - 너무 작으면 : 수렴이 너무 느려 학습이 오래 걸림
+      - 적절한 값을 직접 찾아야 하는 하이퍼파라미터(hyper parameter)
+        * 하이퍼파라미터 : 사람이 직접 설정하는 매개변수 (학습으로 자동 결정되지 않음)
+
+    - gradient_descent 구현
+      def gradient_descent(f, init_x, lr=0.01, step_num=100):
+          x = init_x.copy()
+          for i in range(step_num):
+              grad = numerical_gradient(f, x)
+              x -= lr * grad       # 기울기의 반대 방향으로 lr만큼 이동
+          return x
+      * init_x : 시작 위치 (초기값)
+      * step_num : 반복 횟수
+
+    - 경사하강법 예시 (f(x0, x1) = x0² + x1²)
+      init_x = np.array([-3.0, 4.0])
+      gradient_descent(function_2, init_x, lr=0.1, step_num=100)
+      # 결과: 거의 [0, 0] — 최솟값에 수렴
+
+    - 학습률에 따른 결과 차이
+      - lr=0.1 (적절) : [-6.11e-10, 8.15e-10]  → 거의 (0, 0)에 수렴
+      - lr=10  (너무 큼) : [-2.58e+13, 4.29e+13] → 발산
+      - lr=1e-10 (너무 작음) : [-2.99, 3.99]     → 거의 이동 못함
+
+  - 신경망에서의 기울기 : 손실 함수 L을 가중치 W로 미분한 것 (∂L/∂W)
+    - 지금까지는 x에 대해 미분했지만, 신경망에서는 W에 대해 미분
+      -> 목표: "손실을 줄이려면 가중치 W를 어떻게 바꿔야 하나"를 구하는 것
+    - ∂L/∂W 의 shape = W의 shape 와 동일
+      -> W가 (2×3) 행렬이면 ∂L/∂W 도 (2×3) 행렬
+      -> 각 원소: 해당 가중치를 조금 바꿨을 때 손실 L이 얼마나 변하는지
+
+    - SimpleNet 구현
+      class SimpleNet:
+          def __init__(self):
+              self.W = np.random.randn(2, 3)   # 가중치 (2×3, 정규분포 초기화)
+
+          def predict(self, x):
+              return np.dot(x, self.W)          # 입력 x와 가중치 W의 행렬 곱
+
+          def loss(self, x, t):
+              z = self.predict(x)
+              y = softmax(z)                    # 확률로 변환
+              return cross_entropy_error(y, t)  # 손실값 계산
+
+    - 신경망 기울기 계산
+      net = SimpleNet()
+      x = np.array([0.6, 0.9])    # 입력값
+      t = np.array([0, 0, 1])     # 정답 레이블 (원-핫 인코딩)
+
+      f = lambda w: net.loss(x, t)         # w는 형식 인수 — net.W를 직접 참조
+      dW = numerical_gradient(f, net.W)    # ∂L/∂W 계산
+      * f의 인수 w는 실제로 사용되지 않음
+        -> numerical_gradient 내부에서 net.W를 직접 수정해 편미분을 계산하기 때문
+
+
+  - 학습 알고리즘 구현하기
+    - 신경망 학습의 4단계 절차
+      1단계 미니배치   : 훈련 데이터 중 일부를 무작위로 추출
+      2단계 기울기 산출 : 각 가중치의 손실 함수 기울기 계산 (∂L/∂W)
+      3단계 매개변수 갱신: 기울기 반대 방향으로 가중치 갱신 (경사하강법)
+      4단계 반복       : 1~3단계를 원하는 횟수만큼 반복
+      * 미니배치를 무작위로 뽑아 학습하는 방식 => 확률적 경사하강법 (SGD, Stochastic Gradient Descent)
+
+    - 2층 신경망 클래스 (TwoLayerNet)
+      - 구조 : 입력층 → 은닉층(sigmoid) → 출력층(softmax)
+      - 매개변수 : params 딕셔너리로 관리
+        * W1 : (input_size, hidden_size)  — 1층 가중치
+        * b1 : (hidden_size,)             — 1층 편향
+        * W2 : (hidden_size, output_size) — 2층 가중치
+        * b2 : (output_size,)             — 2층 편향
+      - 가중치 초기화 : weight_init_std * np.random.randn(...)
+        -> 작은 값으로 초기화해야 학습 초반 포화(saturation) 방지
+
+      - 주요 메서드
+        - predict(x)               : 순전파 — x → a1 → z1(sigmoid) → a2 → y(softmax)
+        - loss(x, t)               : 손실값 — CEE(predict(x), t)
+        - accuracy(x, t)           : 정확도 — argmax로 예측 클래스 비교
+        - numerical_gradient(x, t) : W1, b1, W2, b2 각각의 기울기를 딕셔너리로 반환
+
+      - TwoLayerNet 구현 요약
+        class TwoLayerNet:
+            def __init__(self, input_size, hidden_size, output_size, weight_init_std=0.01):
+                self.params = {}
+                self.params['W1'] = weight_init_std * np.random.randn(input_size, hidden_size)
+                self.params['b1'] = np.zeros(hidden_size)
+                self.params['W2'] = weight_init_std * np.random.randn(hidden_size, output_size)
+                self.params['b2'] = np.zeros(output_size)
+
+            def predict(self, x):
+                W1, W2 = self.params['W1'], self.params['W2']
+                b1, b2 = self.params['b1'], self.params['b2']
+                z1 = sigmoid(np.dot(x, W1) + b1)
+                y  = softmax(np.dot(z1, W2) + b2)
+                return y
+
+            def loss(self, x, t):
+                return cross_entropy_error(self.predict(x), t)
+
+            def accuracy(self, x, t):
+                y = np.argmax(self.predict(x), axis=1)
+                t = np.argmax(t, axis=1)
+                return np.sum(y == t) / float(x.shape[0])
+
+            def numerical_gradient(self, x, t):
+                loss_W = lambda W: self.loss(x, t)
+                grads = {}
+                for key in ('W1', 'b1', 'W2', 'b2'):
+                    grads[key] = numerical_gradient(loss_W, self.params[key])
+                return grads
+
+    - 미니배치 학습 구현
+      for i in range(iters_num):
+          batch_mask = np.random.choice(train_size, batch_size)   # 무작위 추출
+          x_batch = x_train[batch_mask]
+          t_batch = t_train[batch_mask]
+          grad = network.numerical_gradient(x_batch, t_batch)     # 기울기 계산
+          for key in ('W1', 'b1', 'W2', 'b2'):
+              network.params[key] -= learning_rate * grad[key]    # 매개변수 갱신
+          train_loss_list.append(network.loss(x_batch, t_batch))  # 손실 기록
+
+    - 시험 데이터로 평가하기
+      - 에폭 (epoch) : 훈련 데이터 전체를 한 번 순회하는 단위
+        -> 예: 훈련 데이터 60,000개, 배치 크기 100 → 1에폭 = 600번 반복
+      - 매 에폭마다 훈련 데이터와 시험 데이터의 정확도를 함께 기록
+        -> 훈련 정확도만 오르고 시험 정확도가 오르지 않으면 과대적합(overfitting) 신호
+      - 수치 미분은 계산이 느려 실제 학습에는 역전파(backpropagation)를 사용
+        -> 역전파는 5장에서 학습 (결과는 수치 미분과 동일, 속도는 훨씬 빠름)
+
+
+5. 오차역전파법 (Backpropagation)
+  - 계산 그래프 (Computational Graph)
+    - 계산 과정을 그래프로 표현한 것
+      - 노드(node) : 연산 (+, ×, 함수 등)
+      - 에지(edge) : 데이터의 흐름
+    - 순전파 (forward propagation) : 왼쪽 → 오른쪽으로 계산 진행
+    - 역전파 (backward propagation) : 오른쪽 → 왼쪽으로 미분값 전달
+
+  - 국소적 계산 (Local Computation)
+    - 각 노드는 자신과 직접 관련된 계산만 처리
+      -> 전체 계산을 몰라도 자신에게 전달된 값과 자신의 미분만으로 역전파 수행 가능
+    - 복잡한 계산도 단순한 노드들의 연결로 분해할 수 있음
+
+  - 왜 계산 그래프를 쓰는가?
+    - 역전파로 여러 변수의 미분을 한 번에 효율적으로 계산할 수 있음
+    - 순전파 1회 + 역전파 1회로 모든 매개변수의 기울기를 구할 수 있음
+      -> 수치 미분: 변수 개수만큼 반복 계산 필요 (느림)
+      -> 역전파: 1회 통과로 전부 계산 (빠름)
+
+  - 연쇄법칙 (Chain Rule)
+    - 계산 그래프의 역전파
+      - 역전파는 "국소적 미분"을 순전파의 반대 방향으로 전달하는 것
+      - 각 노드에서: 상류에서 온 값(E) × 국소적 미분(∂y/∂x) → 하류로 전달
+        -> 국소적 미분: 순전파 y = f(x) 에서 ∂y/∂x
+
+    - 연쇄법칙이란?
+      - 합성 함수 : 여러 함수로 구성된 함수
+        -> 예: z = (x+y)²  →  t = x+y,  z = t²  로 분해 가능
+      - 합성 함수의 미분 = 합성 함수를 구성하는 각 함수의 미분의 곱
+        ∂z/∂x = ∂z/∂t × ∂t/∂x
+      - 예시: z = t², t = x+y 에서 x에 대한 편미분
+        ∂z/∂t = 2t
+        ∂t/∂x = 1
+        ∂z/∂x = 2t × 1 = 2(x+y)
+
+    - 연쇄법칙과 계산 그래프
+      - 순전파 : x, y → [+노드] → t → [²노드] → z
+      - 역전파 : ∂L/∂z → [×2t] → ∂L/∂t → [×1] → ∂L/∂x (= ∂L/∂y)
+        -> 각 노드는 상류에서 온 값에 자신의 국소 미분을 곱해 하류로 넘김
+      - ∂L/∂L = 1 : 역전파 출발값은 항상 1 (자기 자신에 대한 미분)
+
+    - 역전파 흐름 예시 (사과 100원 × 2개, 세금 1.1배)
+      - 순전파 : 100 → [×2] → 200 → [×1.1] → 220
+      - 역전파 : 2.2 ← [×2] ← 1.1 ← [×1.1] ← 1
+        - 1   : 출발값 (∂L/∂L = 1)
+        - 1.1 : ×1.1 노드 통과 → 상류(1) × 로컬 미분(1.1) = 1.1
+        - 2.2 : ×2 노드 통과   → 상류(1.1) × 로컬 미분(2) = 2.2
+          * 의미: 사과 가격이 1원 오르면 최종 금액은 2.2원 오름
+
+  - 역전파 (Backpropagation)
+    - 덧셈 노드의 역전파
+      - z = x + y  →  ∂z/∂x = 1,  ∂z/∂y = 1
+      - 역전파: ∂L/∂x = ∂L/∂z × 1 = ∂L/∂z
+               ∂L/∂y = ∂L/∂z × 1 = ∂L/∂z
+        -> 상류에서 온 기울기를 그대로 하류로 흘려보냄 (값 변환 없음)
+      - ∂L/∂z 가 1이 아닌 이유
+        -> 맨 마지막 노드일 때만 ∂L/∂L = 1
+        -> 중간 노드라면 오른쪽 계산들의 역전파 결과가 흘러들어온 값
+        -> 예시의 1.3은 "이 노드 오른쪽에 다른 계산이 있어 그 역전파 결과가 1.3" 인 상황
+      - 예시 (∂L/∂z = 1.3)
+        -> ∂L/∂x = 1.3 × 1 = 1.3
+        -> ∂L/∂y = 1.3 × 1 = 1.3
+
+    - 곱셈 노드의 역전파
+      - z = x × y  →  ∂z/∂x = y,  ∂z/∂y = x
+        -> x로 미분하면 y가 계수로 남고, y로 미분하면 x가 계수로 남음
+      - 역전파: ∂L/∂x = ∂L/∂z × y   (x쪽엔 y를 곱함)
+               ∂L/∂y = ∂L/∂z × x   (y쪽엔 x를 곱함)
+        -> 순전파 입력값 x, y 를 서로 교환해서 곱하는 구조
+        -> 역전파를 위해 순전파 시 입력값(x, y)을 반드시 저장해야 함
+      - 예시 (x=10, y=5, ∂L/∂z = 1.3)
+        -> ∂L/∂x = 1.3 × 5  = 6.5
+        -> ∂L/∂y = 1.3 × 10 = 13
+
+  - 활성화 함수 레이어 구현
+    - ReLU 레이어
+      - 순전파 : y = x  (x > 0)
+                y = 0  (x ≤ 0)
+      - 역전파 : ∂L/∂x = ∂L/∂y      (x > 0 — 기울기 그대로 전달)
+                ∂L/∂x = 0           (x ≤ 0 — 기울기 차단)
+      - mask : 순전파 때 x ≤ 0 인 위치를 True/False 배열로 저장
+        -> 역전파 때 mask=True 인 위치의 기울기를 0으로 만들기 위해 보관
+      - 구현
+        class Relu:
+            def __init__(self):
+                self.mask = None
+
+            def forward(self, x):
+                self.mask = (x <= 0)   # x<=0 인 위치 저장
+                out = x.copy()
+                out[self.mask] = 0
+                return out
+
+            def backward(self, dout):
+                dout[self.mask] = 0    # 순전파 때 0이었던 위치는 역전파도 0
+                return dout
+
+    - Sigmoid 레이어
+      - 순전파 : y = 1 / (1 + exp(-x))
+      - 역전파 : ∂L/∂x = dout × y × (1 - y)
+
+      - Sigmoid 역전파 계산 그래프 4단계 유도
+        순전파 노드 순서: x → [×(-1)] → [-x] → [exp] → [exp(-x)] → [+1] → [1+exp(-x)] → [역수] → y
+
+        1단계 — 역수 노드 (y = 1/t,  t = 1+exp(-x))
+          ∂y/∂t = -1/t²  →  역전파: dout × (-y²)
+
+        2단계 — 덧셈 노드 (+1)
+          ∂t/∂s = 1  →  역전파: 그대로 통과  →  -dout × y²
+
+        3단계 — exp 노드 (s = exp(u), u = -x)
+          ∂s/∂u = exp(u) = exp(-x)  →  역전파: -dout × y² × exp(-x)
+
+        4단계 — 부호반전 노드 (u = -x)
+          ∂u/∂x = -1  →  역전파: -dout × y² × exp(-x) × (-1) = dout × y² × exp(-x)
+
+        최종 정리 (exp(-x) 를 y 로 치환):
+          y = 1/(1+exp(-x))  →  exp(-x) = 1/y - 1
+
+          dout × y² × exp(-x)
+          = dout × y² × (1/y - 1)     [exp(-x) = 1/y - 1 대입]
+          = dout × (y - y²)
+          = dout × y × (1 - y)
+
+          ∴ ∂L/∂x = dout × y × (1 - y)
+            → x 가 아닌 출력값 y 만 알면 역전파 계산 가능
+            → forward 에서 out(=y) 저장하는 이유
+
+      - out : 순전파 출력값(y)을 저장
+        -> 역전파 식 y × (1-y) 계산에 필요 (x는 필요 없음)
+      - 구현
+        class Sigmoid:
+            def __init__(self):
+                self.out = None
+
+            def forward(self, x):
+                self.out = 1 / (1 + np.exp(-x))
+                return self.out
+
+            def backward(self, dout):
+                return dout * self.out * (1 - self.out)
+
+  - ReLU vs Sigmoid 비교
+    - ReLU
+      - 순전파  : x>0이면 x 그대로, x≤0이면 0
+      - 역전파  : x>0이면 기울기 그대로 전달, x≤0이면 0으로 차단
+      - 저장값  : mask (x≤0 위치를 True/False 배열로 저장)
+      - 기울기  : x>0이면 항상 1 — 기울기가 줄지 않고 그대로 전달됨
+      - 문제점  : Dying ReLU — x가 항상 음수인 뉴런은 기울기가 계속 0이라 가중치가 갱신되지 않음
+    - Sigmoid
+      - 순전파  : 1/(1+exp(-x)), 출력 범위 0~1
+      - 역전파  : dout × y × (1-y)
+      - 저장값  : out (순전파 출력값 y)
+      - 기울기  : x=0일 때 최대 0.25 — 기울기가 항상 1 미만
+      - 문제점  : 기울기 소실 (Vanishing Gradient) — 층이 깊어질수록 0.25씩 곱해져 기울기가 소멸
+    - Dying ReLU : x가 항상 음수인 뉴런은 역전파 기울기가 계속 0 → 가중치가 전혀 갱신 안 됨
+    - 기울기 소실 : y×(1-y) 의 최대값이 0.25 → 층이 깊어질수록 기울기가 0에 수렴
+      -> 깊은 신경망(Deep Network)에서 Sigmoid가 잘 쓰이지 않는 이유
+
+
+  - Affine 계층
+    - Affine 변환이란?
+      - 신경망 순전파에서의 행렬 곱 + 편향 덧셈
+        -> Y = X·W + b  (기하학에서의 아핀 변환에서 이름을 따옴)
+
+    - 역전파 유도 (shape으로 확인)
+      - ∂L/∂X = ∂L/∂Y · W^T
+        -> shape 확인: (3,) · (3, 2) = (2,)  →  X와 동일 ✓
+      - ∂L/∂W = X^T · ∂L/∂Y
+        -> shape 확인: (2, 1) · (1, 3) = (2, 3)  →  W와 동일 ✓
+      - 전치행렬(W^T, X^T)이 등장하는 이유
+        -> 행렬 곱 미분 시 shape을 맞추기 위해 자연스럽게 도출됨
+        -> 수식을 외우기보다 shape 추적으로 유도 가능
+      - x : 순전파 입력값 저장 → 역전파의 dW = x.T · dout 계산에 필요
+
+    - 배치용 Affine 계층
+      - X가 (N, D) 2차원 배열인 경우 (N = 배치 크기, D = 입력 크기)
+      - dX = dout · W^T      shape: (N, M) · (M, D) = (N, D)  ✓
+      - dW = X^T · dout      shape: (D, N) · (N, M) = (D, M)  ✓
+      - db = Σ dout (axis=0) shape: (N, M) → (M,)
+        -> 순전파에서 편향 b가 N개 데이터에 브로드캐스트되었으므로
+           역전파에서는 N개 분량을 axis=0으로 합산해 원래 shape (M,) 으로 되돌림
+      - 구현
+        class Affine:
+            def __init__(self, W, b):
+                self.W = W
+                self.b = b
+                self.x  = None    # 역전파의 dW = x.T · dout 에 필요
+                self.dW = None
+                self.db = None
+
+            def forward(self, x):
+                self.x = x
+                return np.dot(x, self.W) + self.b
+
+            def backward(self, dout):
+                dx      = np.dot(dout, self.W.T)
+                self.dW = np.dot(self.x.T, dout)
+                self.db = np.sum(dout, axis=0)   # 배치 방향 합산
+                return dx
+
+  - Softmax-with-Loss 계층
+    - Softmax와 Cross Entropy Error를 하나의 계층으로 묶은 것
+    - 순전파: x → softmax → y → cross_entropy_error → L
+    - 역전파: dx = (y - t) / batch_size
+      - y - t : 소프트맥스 출력(예측 확률)과 정답 레이블의 차이
+      - / batch_size : 배치용 CEE가 합이 아닌 평균으로 계산되기 때문
+
+    - 왜 역전파가 y-t 로 단순해지는가?
+      - CEE의 역전파 (-t/y) 와 softmax의 역전파를 연쇄법칙으로 합치면 서로 상쇄됨
+      - softmax + CEE 조합은 역전파가 단순해지도록 설계된 구조
+        -> softmax의 단독 역전파는 복잡하지만, CEE와 묶으면 y-t 하나로 끝남
+
+    - 역전파의 직관적 의미
+      - 정답 클래스(t=1) : dx = y - 1  →  음수  →  확률이 낮을수록 기울기가 커짐
+      - 오답 클래스(t=0) : dx = y - 0 = y  →  양수  →  확률이 높을수록 기울기가 커짐
+        -> 정답 확률을 높이고 오답 확률을 낮추는 방향으로 가중치가 갱신됨
+
+    - 구현
+      class SoftmaxWithLoss:
+          def __init__(self):
+              self.loss = None
+              self.y = None    # softmax 출력 — 역전파의 y-t 계산에 필요
+              self.t = None
+
+          def forward(self, x, t):
+              self.t    = t
+              self.y    = softmax(x)
+              self.loss = cross_entropy_error(self.y, self.t)
+              return self.loss
+
+          def backward(self, dout=1):
+              batch_size = self.t.shape[0]
+              dx = (self.y - self.t) / batch_size
+              return dx
+
+  - 오차역전파법 구현하기
+    - 신경망 학습의 전체 그림
+      - 4장과 절차는 동일하나 2단계(기울기 산출)에서 수치 미분 대신 역전파 사용
+        1단계 미니배치    : 훈련 데이터 중 일부를 무작위로 추출
+        2단계 기울기 산출  : 역전파(gradient())로 각 가중치의 손실 기울기 계산
+        3단계 매개변수 갱신 : 기울기 반대 방향으로 가중치 갱신 (경사하강법)
+        4단계 반복        : 1~3단계를 원하는 횟수만큼 반복
+
+    - 오차역전파법을 적용한 신경망 (TwoLayerNet)
+      - 구조 : 입력 → Affine1 → ReLU → Affine2 → SoftmaxWithLoss
+      - 계층 관리 방식 : OrderedDict (순서 있는 딕셔너리)
+        -> 삽입한 순서를 기억하므로 forward 시 순서대로, backward 시 역순으로 반복 가능
+        -> 계층을 추가/변경할 때 for 루프를 수정할 필요 없이 딕셔너리에만 추가하면 됨
+      - 주요 메서드
+        - predict(x)     : layers 를 순서대로 forward → 예측값 반환
+        - loss(x, t)     : predict(x) 후 lastLayer(SoftmaxWithLoss).forward
+        - gradient(x, t) : loss() 1회(순전파) → lastLayer.backward(1) → layers 역순 backward
+                           → Affine1.dW, db / Affine2.dW, db 를 grads 딕셔너리에 수집 후 반환
+      - gradient() 가 numerical_gradient() 보다 훨씬 빠른 이유
+        -> 수치 미분 : 가중치 하나씩 h만큼 바꿔가며 반복 계산 → 가중치 수만큼 순전파 필요
+        -> 역전파    : 순전파 1회 + 역전파 1회로 모든 가중치의 기울기를 한 번에 계산
+      - 구현
+        class TwoLayerNet:
+            def __init__(self, input_size, hidden_size, output_size, weight_init_std=0.01):
+                self.params = {}
+                self.params['W1'] = weight_init_std * np.random.randn(input_size, hidden_size)
+                self.params['b1'] = np.zeros(hidden_size)
+                self.params['W2'] = weight_init_std * np.random.randn(hidden_size, output_size)
+                self.params['b2'] = np.zeros(output_size)
+
+                self.layers = OrderedDict()
+                self.layers['Affine1'] = Affine(self.params['W1'], self.params['b1'])
+                self.layers['Relu1']   = Relu()
+                self.layers['Affine2'] = Affine(self.params['W2'], self.params['b2'])
+                self.lastLayer = SoftmaxWithLoss()
+
+            def predict(self, x):
+                for layer in self.layers.values():
+                    x = layer.forward(x)
+                return x
+
+            def loss(self, x, t):
+                return self.lastLayer.forward(self.predict(x), t)
+
+            def gradient(self, x, t):
+                self.loss(x, t)                                        # 순전파
+                dout = self.lastLayer.backward(1)                      # 역전파 시작
+                for layer in reversed(list(self.layers.values())):
+                    dout = layer.backward(dout)
+                grads = {}
+                grads['W1'] = self.layers['Affine1'].dW
+                grads['b1'] = self.layers['Affine1'].db
+                grads['W2'] = self.layers['Affine2'].dW
+                grads['b2'] = self.layers['Affine2'].db
+                return grads
+
+    - 기울기 확인 (Gradient Check)
+      - 수치 미분과 역전파 결과를 비교해 역전파 구현이 올바른지 검증하는 방법
+      - 오차 계산 : np.average(np.abs(grad_backprop[key] - grad_numerical[key]))
+        -> 오차가 1e-4 이하이면 올바른 구현으로 판단 (수치 미분 자체에 부동소수점 오차 존재)
+      - 학습 전 한 번만 수행 (매번 하면 수치 미분 비용이 크기 때문)
+      - 구현
+        grad_numerical = network.numerical_gradient(x_batch, t_batch)
+        grad_backprop  = network.gradient(x_batch, t_batch)
+        for key in grad_numerical.keys():
+            diff = np.average(np.abs(grad_backprop[key] - grad_numerical[key]))
+            print(key + ": " + str(diff))
+
+    - 오차역전파법을 사용한 학습 구현
+      - 4장의 학습 구현과 거의 동일 — 변경점: numerical_gradient → gradient
+      - 학습 루프
+        for i in range(iters_num):
+            batch_mask = np.random.choice(train_size, batch_size)
+            x_batch    = x_train[batch_mask]
+            t_batch    = t_train[batch_mask]
+            grad = network.gradient(x_batch, t_batch)      # 역전파로 기울기 계산
+            for key in ('W1', 'b1', 'W2', 'b2'):
+                network.params[key] -= learning_rate * grad[key]
+
+
+6. 학습 관련 기술들
+
+  - 매개변수 갱신
+    - 최적화 (Optimization) : 손실 함수의 값을 최솟값으로 만드는 최적 매개변수를 찾는 문제
+      -> 지금까지는 SGD 하나만 사용했지만 더 효율적인 방법들이 존재
+
+    - SGD (Stochastic Gradient Descent, 확률적 경사하강법)
+      - 수식 : W ← W - η × ∂L/∂W
+        * η : 학습률 (learning rate)
+      - 단순하고 직관적이지만 비등방성 함수에서 비효율적
+      - 비등방성 함수 : 방향에 따라 기울기 크기가 다른 함수
+        -> 예: f(x, y) = x²/20 + y²
+           x방향 기울기 x/10 (완만) vs y방향 기울기 2y (가파름)
+           => 기울기 방향이 최솟값 방향을 제대로 가리키지 않음 → 지그재그로 탐색
+      - 구현
+        class SGD:
+            def __init__(self, lr=0.01):
+                self.lr = lr
+
+            def update(self, params, grads):
+                for key in params.keys():
+                    params[key] -= self.lr * grads[key]
+
+    - Momentum
+      - 수식 : v ← αv - η × ∂L/∂W
+               W ← W + v
+        * v : 속도(velocity) — 이전 이동 방향과 크기를 기억 (처음엔 0)
+        * α : 모멘텀 계수 (보통 0.9) — 속도를 얼마나 유지할지 결정
+      - 공이 그릇 안에서 굴러내려가는 물리적 관성을 모방
+        -> αv 항 : 힘이 없을 때 서서히 감속하는 관성 효과
+        -> SGD의 지그재그 문제 개선 — 진동이 줄고 더 빠르게 수렴
+      - 구현
+        class Momentum:
+            def __init__(self, lr=0.01, momentum=0.9):
+                self.lr = lr
+                self.momentum = momentum
+                self.v = None
+
+            def update(self, params, grads):
+                if self.v is None:
+                    self.v = {key: np.zeros_like(val) for key, val in params.items()}
+                for key in params.keys():
+                    self.v[key] = self.momentum * self.v[key] - self.lr * grads[key]
+                    params[key] += self.v[key]
+
+    - AdaGrad
+      - 수식 : h ← h + (∂L/∂W)²
+               W ← W - η × (1/√h) × ∂L/∂W
+        * h : 기울기 제곱의 누적합 (처음엔 0)
+        * 1/√h : 많이 갱신된 가중치일수록 학습률을 낮춤 → 개별 적응형 학습률
+      - 자주 갱신된 가중치는 조금씩, 적게 갱신된 가중치는 크게 갱신
+        -> 처음에는 크게 이동하다가 점점 세밀하게 조정하는 효과
+      - 단점 : 학습이 진행될수록 h가 무한히 커져 학습률이 0에 수렴 → 학습이 멈춤
+        -> 개선판 : RMSProp — 오래된 기울기 영향을 지수적으로 감소시켜 망각하는 구조
+      - 구현
+        class AdaGrad:
+            def __init__(self, lr=0.01):
+                self.lr = lr
+                self.h = None
+
+            def update(self, params, grads):
+                if self.h is None:
+                    self.h = {key: np.zeros_like(val) for key, val in params.items()}
+                for key in params.keys():
+                    self.h[key] += grads[key] ** 2
+                    params[key] -= self.lr * grads[key] / (np.sqrt(self.h[key]) + 1e-7)
+        * 1e-7 : h=0일 때 0으로 나누는 것을 방지
+
+    - Adam
+      - Momentum + AdaGrad 의 장점을 결합한 방법
+        * m : 1차 모멘트 — 기울기의 지수이동평균 (Momentum 역할)
+        * v : 2차 모멘트 — 기울기 제곱의 지수이동평균 (AdaGrad 역할)
+      - 편향 보정 (Bias Correction)
+        -> m, v 를 0으로 초기화하면 초기에 0쪽으로 편향되는 문제 발생
+        -> lr_t = lr × √(1-β₂ᵗ) / (1-β₁ᵗ) 로 초기 편향을 보정
+           * t가 커질수록 보정값이 1에 수렴 → 초기에만 효과가 큼
+      - 하이퍼파라미터 : lr=0.001, β₁=0.9, β₂=0.999 (논문 권장값)
+      - 구현
+        class Adam:
+            def __init__(self, lr=0.001, beta1=0.9, beta2=0.999):
+                self.lr = lr
+                self.beta1 = beta1
+                self.beta2 = beta2
+                self.iter = 0
+                self.m = None
+                self.v = None
+
+            def update(self, params, grads):
+                if self.m is None:
+                    self.m = {key: np.zeros_like(val) for key, val in params.items()}
+                    self.v = {key: np.zeros_like(val) for key, val in params.items()}
+                self.iter += 1
+                lr_t = self.lr * np.sqrt(1 - self.beta2**self.iter) / (1 - self.beta1**self.iter)
+                for key in params.keys():
+                    self.m[key] += (1 - self.beta1) * (grads[key] - self.m[key])
+                    self.v[key] += (1 - self.beta2) * (grads[key]**2 - self.v[key])
+                    params[key] -= lr_t * self.m[key] / (np.sqrt(self.v[key]) + 1e-7)
+
+    - 어떤 옵티마이저를 쓸 것인가?
+      - 정답은 없음 — 문제와 데이터에 따라 결과가 달라짐
+      - Adam : 실무에서 기본값으로 가장 많이 사용 (대부분 상황에서 무난하게 잘 동작)
+      - SGD  : 단순한 문제에서 오히려 일반화 성능이 더 좋을 수 있음
