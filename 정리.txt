@@ -972,3 +972,620 @@
       - 더 정교한 방법 : 베이즈 최적화 (Bayesian Optimization)
         -> 이전 탐색 결과를 수학적으로 활용해 다음 탐색 지점을 스마트하게 선택
         -> Spearmint, GPyOpt 등의 라이브러리 존재
+
+
+7. 합성곱 신경망 (CNN)
+  - 전체 구조
+    - 완전연결 (Fully-connected)
+      - 지금까지 다룬 신경망은 인접하는 계층의 모든 뉴런과 결합되어 있었음
+      - 이러한 연결 방식을 완전연결이라 하며, 완전연결 계층을 Affine 계층이라는 이름으로 구현해옴
+
+    - 완전연결 신경망의 계층 구성
+      - Affine 계층 뒤에 활성화 함수 ReLU(혹은 Sigmoid) 계층이 이어지는 "Affine-ReLU" 조합을 필요한 만큼 반복해서 쌓음
+      - 마지막 출력층은 Affine 계층에 이어 Softmax 계층에서 최종 결과(확률)를 출력
+        -> 예: Affine-ReLU → Affine-ReLU → Affine-ReLU → Affine-ReLU → Affine-Softmax
+
+    - CNN의 계층 구성
+      - 새로운 계층인 합성곱 계층(Convolution)과 풀링 계층(Pooling)이 추가됨
+      - 지금까지의 "Affine-ReLU" 연결이 "Convolution-ReLU-(Pooling)" 흐름으로 바뀜
+        -> 예: Conv-ReLU-Pool → Conv-ReLU-Pool → Conv-ReLU-Pool → Affine-ReLU → Affine-Softmax
+        -> 풀링 계층은 생략되기도 함 (합성곱 계층을 연속으로 쌓는 경우도 있음)
+      - 주의점
+        -> 출력에 가까운 층에서는 지금까지처럼 "Affine-ReLU" 구성을 사용할 수 있음
+        -> 마지막 출력 계층에서는 지금까지처럼 "Affine-Softmax" 조합을 그대로 사용
+
+    - 정리
+      - CNN은 완전연결 신경망에 합성곱 계층과 풀링 계층이 새로 추가된 구조일 뿐
+      - 합성곱 계층과 풀링 계층의 구체적인 동작은 7.2~7.4에서 다룸
+
+  - 합성곱 계층
+    - 완전연결 계층의 문제점
+      - 데이터의 형상이 무시됨
+        -> 이미지는 (채널, 세로, 가로) 로 이뤄진 3차원 데이터이지만, 완전연결 계층에 입력하려면
+           1차원 데이터로 평탄화(flatten)해야 함 (예: MNIST (1, 28, 28) → 784개짜리 1차원)
+        -> 형상에는 공간적 정보가 담겨 있음
+           * 공간적으로 가까운 픽셀은 값이 비슷함
+           * RGB 채널마다 서로 밀접한 관계가 있음
+           * 거리가 먼 픽셀끼리는 관련이 적음
+        -> 완전연결 계층은 형상을 무시하고 모든 입력을 동등한 뉴런으로 취급 → 형상에 담긴 정보를 살릴 수 없음
+      - 합성곱 계층은 형상을 유지함
+        -> 이미지도 3차원 데이터로 입력받고, 3차원 데이터로 다음 계층에 전달
+        -> CNN에서는 합성곱 계층의 입출력 데이터를 특징 맵(feature map)이라고 함
+           * 입력 특징 맵(input feature map) / 출력 특징 맵(output feature map)
+
+    - 합성곱 연산
+      - 이미지 처리에서 말하는 필터 연산에 해당 (필터 = 커널)
+      - 입력 데이터에 필터를 일정 간격으로 이동시키며 적용
+        -> 대응하는 원소끼리 곱한 후 총합을 구함 (단일 곱셈-누산, FMA)
+        -> 결과를 출력의 해당 위치에 저장 → 모든 위치에서 이를 수행하면 합성곱 연산의 출력 완성
+      - 예: 입력 (4, 4) + 필터 (3, 3) → 출력 (2, 2)
+      - CNN에서는 필터의 매개변수가 지금까지의 가중치(W)에 해당
+      - 편향
+        -> 필터를 적용한 후의 데이터에 편향을 더함
+        -> 편향은 항상 1개(1×1)만 존재하며, 필터 적용 후의 모든 원소에 같은 값을 더함
+
+    - 패딩 (Padding)
+      - 합성곱 연산 전에 입력 데이터 주변을 특정 값(주로 0)으로 채우는 것
+      - 예: (4, 4) 입력에 폭 1짜리 패딩 → (6, 6) 이 됨
+      - 사용 이유 : 출력 크기를 조정하기 위함
+        -> 합성곱을 거칠 때마다 크기가 계속 작아지면 어느 시점에 출력 크기가 1이 되어
+           더 이상 합성곱 연산을 적용할 수 없게 됨
+        -> 패딩으로 입력 데이터의 공간적 크기를 고정한 채 다음 계층에 전달 가능
+
+    - 스트라이드 (Stride)
+      - 필터를 적용하는 위치의 간격
+      - 스트라이드를 키우면 출력 크기는 작아지고, 패딩을 키우면 출력 크기는 커짐
+      - 출력 크기 계산 공식
+        -> 입력 크기 (H, W), 필터 크기 (FH, FW), 패딩 P, 스트라이드 S, 출력 크기 (OH, OW)
+        -> OH = (H + 2P - FH) / S + 1
+        -> OW = (W + 2P - FW) / S + 1
+        -> 계산 결과가 정수로 나누어떨어져야 함
+           (프레임워크에 따라 나누어떨어지지 않을 때 가장 가까운 정수로 반올림하는 등 대응하기도 함)
+
+    - 3차원 데이터의 합성곱 연산
+      - 이미지는 세로·가로에 채널까지 고려한 3차원 데이터
+      - 채널 쪽으로 특징 맵이 여러 개면, 입력 데이터와 필터의 합성곱 연산을 채널마다 수행하고
+        그 결과를 더해서 하나의 출력을 얻음
+      - 주의점 : 입력 데이터의 채널 수와 필터의 채널 수는 반드시 같아야 함
+        -> 필터 크기는 원하는 값으로 설정 가능 (단, 모든 채널의 필터가 같은 크기여야 함)
+
+    - 블록으로 생각하기
+      - 3차원 합성곱 연산은 데이터와 필터를 직육면체 블록으로 생각하면 이해하기 쉬움
+      - 3차원 데이터를 배열로 나타낼 때는 (채널, 높이, 너비) 순서로 씀 → (C, H, W)
+      - 필터가 1개면 출력은 채널이 1개인 특징 맵 한 장
+      - 합성곱 연산의 출력으로 다수의 채널을 내보내려면 필터(가중치)를 여러 개 사용해야 함
+        -> 필터를 FN개 적용하면 출력 맵도 FN개 생성됨 → 형상이 (FN, OH, OW)인 블록 완성
+        -> 필터의 가중치 데이터는 4차원 : (출력 채널 수, 입력 채널 수, 높이, 너비) → (FN, C, FH, FW)
+      - 편향은 채널 하나당 값 하나 (형상 : (FN, 1, 1))
+        -> 각 채널의 모든 원소에 편향값이 브로드캐스트되어 더해짐
+
+    - 배치 처리
+      - 신경망 처리에서는 입력 데이터를 한 덩어리로 묶어 배치로 처리함
+      - 합성곱 연산도 완전연결 신경망과 마찬가지로 배치 처리를 지원해야 함
+      - 각 계층을 흐르는 데이터의 차원을 하나 늘려 4차원으로 저장 : (데이터 수, 채널 수, 높이, 너비) → (N, C, H, W)
+      - 데이터가 N개일 때 한 번의 처리로 N회 분의 처리를 수행 (배치 차원은 앞쪽에서 함께 흘러갈 뿐 연산 로직은 동일)
+
+  - 풀링 계층
+    - 풀링(Pooling)이란?
+      - 세로·가로 방향의 공간을 줄이는 연산
+      - 예 : 2×2 최대 풀링을 스트라이드 2로 처리 → 2×2 크기의 대상 영역을 원소 하나로 집약해 공간 크기를 줄임
+      - 최대 풀링 (Max Pooling) : 대상 영역에서 최댓값을 취하는 연산 (이미지 인식 분야에서 주로 사용)
+      - 평균 풀링 (Average Pooling) : 대상 영역의 평균을 계산하는 연산
+      - 풀링 윈도우의 크기와 스트라이드는 같은 값으로 설정하는 것이 일반적 (예 : 3×3 윈도우 → 스트라이드도 3)
+
+    - 풀링 계층의 특징
+      - 학습해야 할 매개변수가 없음
+        -> 대상 영역에서 최댓값(또는 평균)을 취하는 처리일 뿐이므로 학습할 매개변수가 존재하지 않음
+      - 채널 수가 변하지 않음
+        -> 입력 데이터의 채널마다 독립적으로 계산하므로, 풀링을 거쳐도 채널 수는 그대로 유지됨
+      - 입력의 변화에 영향을 적게 받음 (강건함, robust)
+        -> 입력 데이터가 조금 변해도 풀링의 결과는 잘 변하지 않음
+        -> 예 : 입력 데이터가 가로·세로 방향으로 1픽셀씩 어긋나도 풀링을 거치면 여전히 같은 결과가 나옴
+           (미세한 위치 변화를 흡수해 사라지게 함)
+
+  - 합성곱/풀링 계층 구현하기
+    - 4차원 배열
+      - CNN에서 계층 사이를 흐르는 데이터는 4차원
+        -> 예 : 데이터 10개, 채널 1개, 세로 28, 가로 28 → (10, 1, 28, 28)
+      - numpy로는 원하는 순서의 다차원 배열을 자유롭게 생성 가능
+        -> x = np.random.rand(10, 1, 28, 28) → x.shape = (10, 1, 28, 28)
+        -> 첫 번째 데이터 : x[0].shape → (1, 28, 28)
+        -> 첫 번째 데이터의 첫 채널의 공간 데이터 : x[0, 0] (또는 x[0][0])
+      - 4차원 데이터를 다뤄야 해서 합성곱 연산 구현이 복잡해 보이지만, im2col이라는 트릭으로 단순하게 해결 가능
+
+    - im2col로 데이터 전개하기
+      - 합성곱 연산을 곧이곧대로 구현하면 for문을 여러 겹 써야 함(7.2 실습의 4중 for문)
+        -> Numpy에서는 원소 접근 시 for문을 사용하면 성능이 떨어짐 (큰 배열은 한꺼번에 계산하는 편이 유리)
+      - im2col : 입력 데이터를 필터링(가중치 연산)하기 좋게 2차원 행렬로 전개해주는 함수
+        -> 입력 데이터에서 필터를 적용하는 영역(3차원 블록)을 한 줄로 늘어놓음
+        -> 이 전개를 필터를 적용하는 모든 영역에서 수행한 것이 im2col의 결과
+      - im2col의 단점
+        -> 필터 적용 영역이 겹치는 경우가 대부분이라, 전개 후 원소 수가 원래 블록의 원소 수보다 많아짐
+        -> 즉 메모리를 더 많이 소비함
+      - 그럼에도 사용하는 이유
+        -> 컴퓨터는 큰 행렬을 묶어서 계산하는 데 최적화되어 있음
+        -> 문제를 행렬 계산으로 만들면 선형대수 라이브러리를 활용해 효율을 크게 높일 수 있음
+      - 합성곱 계층 구현 절차 (Affine 계층과 유사한 흐름)
+        1단계 : im2col로 입력 데이터를 전개
+        2단계 : 필터(가중치)를 reshape으로 2차원 배열로 전개
+        3단계 : 두 행렬의 곱(np.dot)을 계산
+        4단계 : 출력 데이터를 reshape(과 transpose)으로 4차원으로 변형
+      - im2col 함수 인터페이스
+        -> im2col(input_data, filter_h, filter_w, stride=1, pad=0)
+        -> input_data : (데이터 수, 채널 수, 높이, 너비)의 4차원 배열
+        -> filter_h, filter_w : 필터의 높이·너비 / stride, pad : 스트라이드·패딩
+        -> 반환값 : 2차원 배열
+
+    - 합성곱 계층 구현하기
+      - reshape에 -1을 지정하면 다차원 배열의 원소 수가 변환 전후로 같아지도록 알아서 묶어줌
+        -> 예 : 원소 750개인 (10, 3, 5, 5) 배열을 reshape(10, -1) 하면 (10, 75)로 묶임
+      - forward 마지막에는 출력을 reshape(-1 지정)한 뒤 transpose로 축 순서를 (N, C, H, W)로 재배치
+        -> transpose : 다차원 배열의 축 순서를 인덱스(번호)로 바꿔주는 함수
+      - 구현
+        class Convolution:
+            def __init__(self, W, b, stride=1, pad=0):
+                self.W, self.b = W, b
+                self.stride, self.pad = stride, pad
+                self.x = None
+                self.col = None
+                self.col_W = None       # 역전파용 저장
+                self.dW = None
+                self.db = None
+
+            def forward(self, x):
+                FN, C, FH, FW = self.W.shape
+                N, C, H, W = x.shape
+                out_h = 1 + int((H + 2*self.pad - FH) / self.stride)
+                out_w = 1 + int((W + 2*self.pad - FW) / self.stride)
+
+                col = im2col(x, FH, FW, self.stride, self.pad)
+                col_W = self.W.reshape(FN, -1).T      # 필터 전개
+                out = np.dot(col, col_W) + self.b
+
+                out = out.reshape(N, out_h, out_w, -1).transpose(0, 3, 1, 2)
+
+                self.x, self.col, self.col_W = x, col, col_W
+                return out
+
+            def backward(self, dout):
+                FN, C, FH, FW = self.W.shape
+                dout = dout.transpose(0, 2, 3, 1).reshape(-1, FN)
+
+                self.db = np.sum(dout, axis=0)
+                self.dW = np.dot(self.col.T, dout).transpose(1, 0).reshape(FN, C, FH, FW)
+
+                dcol = np.dot(dout, self.col_W.T)
+                dx = col2im(dcol, self.x.shape, FH, FW, self.stride, self.pad)
+                return dx
+
+    - 풀링 계층 구현하기
+      - 풀링 계층도 im2col로 입력 데이터를 전개해서 구현
+        -> 단, 채널 쪽이 서로 독립적이라는 점이 합성곱 계층 때와 다름 (채널마다 따로 전개)
+      - 구현 절차
+        1단계 : 입력 데이터를 전개
+        2단계 : 행별 최댓값을 구함
+        3단계 : 적절한 모양으로 성형
+      - 구현
+        class Pooling:
+            def __init__(self, pool_h, pool_w, stride=1, pad=0):
+                self.pool_h, self.pool_w = pool_h, pool_w
+                self.stride, self.pad = stride, pad
+                self.x = None
+                self.arg_max = None     # 역전파용 : 최댓값의 위치 기억
+
+            def forward(self, x):
+                N, C, H, W = x.shape
+                out_h = int(1 + (H - self.pool_h) / self.stride)
+                out_w = int(1 + (W - self.pool_w) / self.stride)
+
+                col = im2col(x, self.pool_h, self.pool_w, self.stride, self.pad)
+                col = col.reshape(-1, self.pool_h * self.pool_w)
+
+                arg_max = np.argmax(col, axis=1)
+                out = np.max(col, axis=1)
+
+                out = out.reshape(N, out_h, out_w, C).transpose(0, 3, 1, 2)
+
+                self.x, self.arg_max = x, arg_max
+                return out
+
+            def backward(self, dout):
+                dout = dout.transpose(0, 2, 3, 1)
+                pool_size = self.pool_h * self.pool_w
+                dmax = np.zeros((dout.size, pool_size))
+                dmax[np.arange(self.arg_max.size), self.arg_max.flatten()] = dout.flatten()
+                dmax = dmax.reshape(dout.shape + (pool_size,))
+
+                dcol = dmax.reshape(dmax.shape[0] * dmax.shape[1] * dmax.shape[2], -1)
+                dx = col2im(dcol, self.x.shape, self.pool_h, self.pool_w, self.stride, self.pad)
+                return dx
+        * 역전파에서 argmax로 기억해둔 위치에만 기울기를 흘려보내고 나머지는 0
+          → 최댓값에 기여한 원소만 손실에 영향을 줬으므로 그 위치에만 기울기가 전달되는 것이 자연스러움
+
+  - CNN 구현하기 (SimpleConvNet)
+    - 구조 : 입력 → Conv1 → ReLU1 → Pool1 → Affine1 → ReLU2 → Affine2 → SoftmaxWithLoss
+      -> TwoLayerNet(5장)의 앞부분에 "Conv-ReLU-Pool"이 하나 추가된 형태일 뿐, 나머지 흐름과 구현 패턴은 동일
+    - 계층 관리 방식 : OrderedDict (TwoLayerNet과 동일하게 순서를 기억해 forward/backward에 활용)
+    - 초기화 인수
+      -> input_dim : 입력 데이터 형상 (예 : (1, 28, 28))
+      -> conv_param : 합성곱 계층의 하이퍼파라미터 딕셔너리
+         { 'filter_num': 필터 개수, 'filter_size': 필터 크기, 'pad': 패딩, 'stride': 스트라이드 }
+      -> hidden_size : 은닉층(Affine1) 뉴런 수 / output_size : 출력층 뉴런 수 / weight_init_std : 가중치 초깃값 표준편차
+    - 합성곱 계층의 출력 크기 계산 (미리 계산해서 Affine1의 입력 크기를 정함)
+      -> conv_output_size = (input_size - filter_size + 2*pad) / stride + 1
+      -> pool_output_size = filter_num * (conv_output_size/2) * (conv_output_size/2)
+         (풀링은 2×2, 스트라이드 2를 가정 → 가로세로가 절반으로 줄어듦)
+    - 가중치 매개변수 초기화
+      -> W1, b1 : 합성곱 필터 (형상 : (filter_num, input_channel, filter_size, filter_size))
+      -> W2, b2 : 첫 번째 Affine (형상 : (pool_output_size, hidden_size))
+      -> W3, b3 : 두 번째 Affine (형상 : (hidden_size, output_size))
+    - 주요 메서드 (TwoLayerNet과 동일한 패턴)
+      -> predict(x)     : layers 를 순서대로 forward → 예측값 반환
+      -> loss(x, t)      : predict(x) 후 last_layer(SoftmaxWithLoss).forward
+      -> accuracy(x, t)  : 배치 단위로 나눠 예측 후 정답과 비교해 정확도 계산
+      -> numerical_gradient(x, t) : 수치 미분으로 기울기 계산 (검증용, 매우 느림)
+      -> gradient(x, t)  : loss() 1회(순전파) → last_layer.backward(1) → layers 역순 backward
+                           → Conv1.dW,db / Affine1.dW,db / Affine2.dW,db 를 grads 딕셔너리(W1~W3, b1~b3)로 수집
+    - 구현
+      class SimpleConvNet:
+          def __init__(self, input_dim=(1, 28, 28),
+                       conv_param={'filter_num': 30, 'filter_size': 5, 'pad': 0, 'stride': 1},
+                       hidden_size=100, output_size=10, weight_init_std=0.01):
+              filter_num = conv_param['filter_num']
+              filter_size = conv_param['filter_size']
+              filter_pad = conv_param['pad']
+              filter_stride = conv_param['stride']
+              input_size = input_dim[1]
+              conv_output_size = (input_size - filter_size + 2*filter_pad) / filter_stride + 1
+              pool_output_size = int(filter_num * (conv_output_size/2) * (conv_output_size/2))
+
+              # 가중치 초기화
+              self.params = {}
+              self.params['W1'] = weight_init_std * \
+                                  np.random.randn(filter_num, input_dim[0], filter_size, filter_size)
+              self.params['b1'] = np.zeros(filter_num)
+              self.params['W2'] = weight_init_std * \
+                                  np.random.randn(pool_output_size, hidden_size)
+              self.params['b2'] = np.zeros(hidden_size)
+              self.params['W3'] = weight_init_std * \
+                                  np.random.randn(hidden_size, output_size)
+              self.params['b3'] = np.zeros(output_size)
+
+              # 계층 생성
+              self.layers = OrderedDict()
+              self.layers['Conv1'] = Convolution(self.params['W1'], self.params['b1'],
+                                                 conv_param['stride'], conv_param['pad'])
+              self.layers['Relu1'] = Relu()
+              self.layers['Pool1'] = Pooling(pool_h=2, pool_w=2, stride=2)
+              self.layers['Affine1'] = Affine(self.params['W2'], self.params['b2'])
+              self.layers['Relu2'] = Relu()
+              self.layers['Affine2'] = Affine(self.params['W3'], self.params['b3'])
+              self.last_layer = SoftmaxWithLoss()
+
+          def predict(self, x):
+              for layer in self.layers.values():
+                  x = layer.forward(x)
+              return x
+
+          def loss(self, x, t):
+              y = self.predict(x)
+              return self.last_layer.forward(y, t)
+
+          def accuracy(self, x, t, batch_size=100):
+              if t.ndim != 1: t = np.argmax(t, axis=1)
+              acc = 0.0
+              for i in range(int(x.shape[0] / batch_size)):
+                  tx = x[i*batch_size:(i+1)*batch_size]
+                  tt = t[i*batch_size:(i+1)*batch_size]
+                  y = self.predict(tx)
+                  y = np.argmax(y, axis=1)
+                  acc += np.sum(y == tt)
+              return acc / x.shape[0]
+
+          def gradient(self, x, t):
+              # 순전파
+              self.loss(x, t)
+              # 역전파
+              dout = self.last_layer.backward(1)
+              layers = list(self.layers.values())
+              layers.reverse()
+              for layer in layers:
+                  dout = layer.backward(dout)
+              # 결과 저장
+              grads = {}
+              grads['W1'], grads['b1'] = self.layers['Conv1'].dW, self.layers['Conv1'].db
+              grads['W2'], grads['b2'] = self.layers['Affine1'].dW, self.layers['Affine1'].db
+              grads['W3'], grads['b3'] = self.layers['Affine2'].dW, self.layers['Affine2'].db
+              return grads
+      * save_params/load_params : pickle로 학습된 params 딕셔너리를 저장/불러오기 (재학습 없이 추론에 재사용)
+
+  - CNN 시각화하기
+    - 1번째 층의 가중치 시각화하기
+      - 앞서 학습한 CNN의 1번째 합성곱 계층 가중치(W1)의 형상은 (필터 수, 채널 수, 5, 5)
+      - 필터 크기가 5×5이고 채널이 1개(회색조)이므로, 필터 하나하나를 1채널짜리 이미지로 시각화 가능
+      - 학습 전 필터 : 무작위로 초기화되어 규칙성 없는 흑백 패턴 (완전한 잡음)
+      - 학습 후 필터 : 규칙을 띠는 패턴으로 변화
+        -> 일부는 흰색에서 검은색으로 서서히 변하는 필터 (엣지, edge : 색상이 바뀌는 경계에 반응)
+        -> 일부는 국소적으로 덩어리진 영역을 가진 필터 (블롭, blob : 특정 영역에 반응)
+      - 즉, 합성곱 계층의 필터는 학습을 통해 에지나 블롭 같은 원시적(저수준) 정보를 추출하도록 갱신됨
+
+    - 층 깊이에 따른 추출 정보 변화
+      - 1번째 층의 합성곱 계층에서는 에지·블롭 같은 저수준(low-level) 정보가 추출됨
+      - 딥러닝의 흥미로운 특징 : 층이 깊어질수록 뉴런이 반응하는 대상이 점점 더 추상화됨
+      - 예 : 8층 CNN(AlexNet 구조)의 경우
+        -> 합성곱 계층과 풀링 계층을 여러 겹 쌓고 마지막에 완전연결 계층을 거쳐 결과를 출력
+        -> 처음 층은 단순한 에지에 반응 → 다음 층은 텍스처에 반응 → 더 깊은 층은 복잡한 사물의 일부에 반응
+        -> 층이 깊어질수록 단순한 모양(저수준 정보)에서 '고급' 정보로 반응 대상이 변화
+      - 결국 층을 깊게 쌓을수록 네트워크가 사물의 '의미'를 이해하도록 변화해가는 것
+      - (참고) 이번 실습의 SimpleConvNet은 합성곱 계층이 1개뿐이라 이 현상을 직접 재현할 수는 없고,
+        1번째 층 필터 시각화만으로 저수준 정보 추출을 확인함. 여러 겹 쌓았을 때의 추상화 변화는
+        7.7의 LeNet/AlexNet 같은 깊은 구조에서 나타남
+
+  - 대표적인 CNN
+    - LeNet
+      - CNN의 원조 격 네트워크, 1998년에 제안됨
+      - 구조 : 합성곱 계층과 풀링(정확히는 서브샘플링) 계층을 반복하고, 마지막으로 완전연결 계층을 거쳐 결과를 출력
+      - 현재의 CNN과 다른 점
+        -> 활성화 함수 : LeNet은 시그모이드 함수 사용 (현재는 주로 ReLU 사용)
+        -> 서브샘플링(subsampling) : LeNet은 서브샘플링으로 중간 데이터 크기를 줄임 (현재는 최대 풀링이 주류)
+      - 이런 차이는 있지만 기본 원리(합성곱-풀링 반복 → 완전연결)는 지금과 크게 다르지 않음
+
+    - AlexNet
+      - 2012년에 발표되어 딥러닝 열풍을 일으키는 데 큰 역할을 한 네트워크
+      - 구조 면에서는 LeNet과 크게 다르지 않음 : 합성곱 계층과 풀링 계층을 거듭하며 마지막에 완전연결 계층을 거쳐 결과 출력
+      - LeNet과의 차이점
+        -> 활성화 함수로 ReLU를 사용
+        -> LRN(Local Response Normalization) : 국소적 정규화를 실시하는 계층을 이용
+        -> 드롭아웃(6.4절)을 사용해 오버피팅 억제
+      - 딥러닝 발전의 배경 : 빅데이터와 GPU
+        -> 대량의 데이터를 얻기 쉬워짐 (빅데이터)
+        -> 병렬 계산에 특화된 GPU가 보급되어 대량의 연산을 고속으로 수행 가능해짐
+        -> 알고리즘(네트워크 구조) 자체의 혁신보다도 이런 환경 변화가 딥러닝 발전에 크게 기여함
+
+
+8. 딥러닝
+  - 더 깊게
+    - 더 깊은 네트워크로
+      - 지금까지 배운 기법들을 조합해 정확도를 더 높인 심층 CNN을 구축할 수 있음
+      - 책에서 구성한 심층 CNN의 특징 (VGG 신경망 기반 구조)
+        -> 합성곱 계층은 모두 3×3의 작은 필터 사용
+        -> 층이 깊어지면서 채널 수가 점점 늘어남 (예 : 16 → 16 → 32 → 32 → 64 → 64)
+        -> 풀링 계층을 추가해 중간 데이터의 공간 크기를 점차 줄여감
+        -> 마지막 완전연결 계층에서는 드롭아웃(6.4절) 사용
+        -> 가중치 초깃값으로 He 초깃값(6.2절) 사용
+        -> 배치 정규화(6.3절) 계층을 삽입
+      - 이런 심층 CNN으로 MNIST 데이터셋에서 99% 이상(99.38%)의 정확도를 달성
+
+    - 정확도를 더 높이려면
+      - 정확도를 높이는 대표적인 기술적 트릭
+        -> 앙상블 학습 : 여러 신경망을 개별적으로 학습시키고, 추론 시 그 출력을 평균 내는 등으로 종합
+        -> 학습률 감소 : 학습이 진행됨에 따라 학습률을 점차 줄여감
+        -> 데이터 확장(Data Augmentation) : 손쉬운데도 효과가 큰 방법
+      - 데이터 확장이란?
+        -> 입력 이미지(훈련 이미지)를 알고리즘을 동원해 인위적으로 확장하는 것
+        -> 방법 예시
+           * 회전 / 이동 등 미세한 변화
+           * crop(일부를 잘라냄)
+           * flip(좌우 반전, 대칭성을 고려해야 하는 경우엔 사용 자제 — 예: 숫자 인식)
+           * 밝기 등 외형 변화
+           * 확대·축소
+        -> 데이터가 적을 때 특히 효과적인 방법
+
+    - 깊게 하는 이유
+      - 층을 깊게 하는 것의 중요성 - 이론적으로 명확히 밝혀진 것은 아니지만, 다음 두 가지 이점이 있음
+      - 이점 1 : 신경망의 매개변수 수 감소
+        -> 층을 깊게 한 네트워크는 깊지 않은 경우보다 적은 매개변수로 같은(혹은 그 이상의) 표현력을 달성 가능
+        -> 예 : 5×5 합성곱 연산 1회는, 3×3 합성곱 연산을 2회 수행하는 것으로 같은 크기의 영역(수용 영역)을 커버 가능
+           * 3×3 두 번 : 매개변수 수 = 3×3×2 = 18개
+           * 5×5 한 번  : 매개변수 수 = 5×5   = 25개
+           * 즉, 작은 필터를 여러 겹 쌓으면 매개변수 수를 줄이면서도 넓은 수용 영역(receptive field)을 소화 가능
+        -> 게다가 층을 거듭할 때마다 ReLU 등 활성화 함수를 통과 → 비선형성이 추가되어 표현력이 한층 더 늘어남
+           (단순 합성곱 1회보다 합성곱+활성화 함수를 반복하는 쪽이 복잡한 것을 표현 가능)
+      - 이점 2 : 학습의 효율성
+        -> 층을 깊게 함으로써 학습 데이터의 양을 줄이고 학습을 고속으로 수행 가능
+        -> CNN은 계층적으로 정보를 전달함 : 앞단 계층은 에지 같은 단순한 패턴, 층이 깊어질수록 더 추상적인 정보를 학습 (7.6절과 동일 원리)
+        -> 각 층이 학습해야 할 문제를 계층적으로 분해 가능
+           * 처음 층은 에지 학습에만 전념
+           * 다음 층들은 그 에지를 조합해 더 복잡한 패턴을 학습
+        -> 즉 학습해야 할 문제를 여러 층으로 분산해서 각 층은 더 단순한 문제만 풀면 되므로 효율적으로 학습 가능
+
+  - 딥러닝의 초기 역사
+    - ImageNet
+      - 100만 장이 넘는 이미지를 담고 있는 대규모 이미지 데이터셋
+      - 다양한 종류의 이미지를 포함하며, 각 이미지에는 레이블(클래스 이름)이 붙어 있음
+      - ILSVRC(ImageNet Large Scale Visual Recognition Challenge)
+        -> 이 거대한 데이터셋을 사용한 이미지 인식 대회
+        -> 그 안에 분류(classification)를 포함한 다양한 부문이 마련되어 있음
+      - ILSVRC 역대 우승 기법들의 오류율 추이를 보면 최근 딥러닝 기술의 발전 과정을 확인할 수 있음
+        -> 2012년 AlexNet이 등장하면서 오류율이 크게 낮아짐 -> 이후 딥러닝이 화제의 중심이 됨
+        -> 2015년경에는 층을 더 깊게 쌓은 신경망(ResNet 등)이 등장해 오류율이 더욱 낮아짐 (일부 부문에서는 사람의 인식 능력을 넘어서기도 함)
+
+    - VGG
+      - 합성곱 계층과 풀링 계층으로 구성되는 기본적인 CNN
+      - 특징
+        -> 3x3의 작은 필터를 사용한 합성곱 계층을 연속으로 거치는 것이 특징 (8.1절에서 다룬 3x3 필터 스태킹과 동일한 아이디어)
+        -> conv-conv-pool 형태로 묶은 블록을 반복해서 쌓아 층을 깊게 함
+        -> 마지막에는 완전연결 계층을 거쳐 결과를 출력하며, 완전연결 계층에서는 드롭아웃(6.4절) 사용
+      - 층의 깊이에 따라 VGG16(가중치 있는 층 16개), VGG19(19개)로 불림
+      - 구조가 간단해서 응용하기 좋다는 점 때문에 많은 기술자들이 즐겨 사용하는 신경망
+        -> (참고) 구조가 단순해 다른 문제에 가중치를 그대로 재사용하는 전이 학습(transfer learning)에도 활용하기 좋음
+
+    - GoogLeNet
+      - 세로 방향 깊이뿐 아니라 가로 방향으로도 깊이(폭)가 있다는 것이 특징인 네트워크
+      - 인셉션 구조(inception structure)
+        -> 크기가 다른 필터(와 풀링)를 여러 개 적용하여 그 결과를 결합하는 구성
+        -> 이 인셉션 구조를 하나의 빌딩 블록(구성 요소)처럼 사용해 여러 단을 쌓음
+      - 1x1 크기의 필터를 사용한 합성곱 계층을 인셉션 구조 곳곳에서 사용
+        -> 채널 방향으로 크기를 줄여주는 역할을 함 (예 : 채널 수 192 -> 1x1 conv로 16까지 줄인 뒤 3x3 conv 수행)
+        -> 그 결과 매개변수 제거와 고속화에 기여
+
+    - ResNet
+      - 마이크로소프트 팀이 개발한 네트워크
+      - 층을 깊게 하는 것은 성능 향상에 중요하지만, 지나치게 깊이 쌓으면 오히려 학습이 잘 되지 않아 성능이 떨어지는 경우가 많았음
+      - ResNet은 이 문제를 해결하기 위해 스킵 연결(skip connection, 숏컷)을 도입
+        -> 스킵 연결이란 입력 데이터를 합성곱 계층을 건너뛰어 출력에 바로 더해주는 구조
+        -> 즉, 출력 y = F(x) + x  (합성곱 계층 F가 학습해야 할 대상이 원래 매핑 H(x)가 아니라 잔차 H(x) - x가 되도록 함 -> 잔차 학습, residual learning)
+      - 스킵 연결의 이점
+        -> 역전파 시 스킵 연결이 신호 감쇠를 막아줌 : 상류(뒤쪽 층)의 기울기를 아무 가공 없이 그대로 하류(앞쪽 층)로 흘려보내는 경로가 생김
+        -> 기울기 소실(vanishing gradient) 문제가 완화되어, 층을 깊게 쌓아도 학습이 효율적으로 이루어짐
+        -> 실제로 층을 깊게 할수록 오히려 성능이 나빠지던 plain 네트워크와 달리, 스킵 연결이 있는 residual 네트워크는 층을 깊게 할수록 정확도가 개선되는 경향을 보임
+      - ResNet은 기존 신경망보다 층을 훨씬 깊게 쌓을 수 있음(150층을 넘는 경우도 있음) -> ILSVRC 대회에서 톱(top) 수준의 정확도를 기록
+      - 전이 학습(transfer learning)
+        -> 학습된 가중치(혹은 그 일부)를 다른 신경망에 복사한 다음, 그 상태로 재학습(fine tuning)을 수행하는 것
+        -> 예 : VGG와 구조가 같은(혹은 유사한) 신경망을 준비하고, ImageNet의 방대한 데이터셋으로 미리 학습된 가중치를 초깃값으로 사용해 새로운 데이터셋에 맞게 재학습
+        -> 보유한 데이터셋이 적을 때 특히 유용한 방법
+
+  - 더 빠르게(속도 개선)
+    - 풀어야 할 숙제
+      - 딥러닝은 대량의 학습 데이터를 사용해 긴 시간 학습을 수행해야 함 -> 학습 속도를 높이는 것이 중요한 과제
+      - 예 : AlexNet의 forward 처리 시간을 계층별로 분석해보면, 합성곱 계층에서 소요되는 시간이 전체의 대부분(약 95%)을 차지
+        -> 즉, 딥러닝 고속화는 곧 합성곱 계층에서 이뤄지는 연산을 어떻게 고속화하느냐의 문제
+        -> 합성곱 계층에서 수행하는 연산은 결국 큰 행렬의 곱셈으로 정리 가능 (7.4절의 im2col과 동일한 원리)
+      - 딥러닝 고속화 방법 크게 세 가지
+        -> GPU를 활용한 고속화
+        -> 계산을 여러 장치로 나누어 처리하는 분산 학습
+        -> 연산 정밀도(비트 수)를 낮춰 고속화
+
+    - GPU를 활용한 고속화
+      - GPU는 원래 그래픽 처리(화면 렌더링)를 위한 장치이지만, 병렬 수치 연산을 고속으로 수행할 수 있음
+      - GPU 컴퓨팅 : 그래픽 처리 이외의 범용 수치 연산에 GPU를 활용하는 것
+      - CPU와 GPU의 특성 차이
+        -> CPU : 연속적이고 복잡한 계산이나 다양한 명령을 처리하는 데 특화
+        -> GPU : 병렬적인 단순 계산을 대량으로 동시에 수행하는 데 특화
+      - 딥러닝에서는 합성곱 계층 등에서 대량의 곱하기-누적 연산(단순 계산의 반복)을 수행해야 함
+        -> 이런 대량의 병렬 연산은 CPU보다 GPU로 처리하는 쪽이 압도적으로 빠름
+      - 엔비디아(NVIDIA) GPU를 사용하는 딥러닝 프레임워크가 많음
+        -> CUDA : NVIDIA가 제공하는 GPU 컴퓨팅용 통합 개발 환경
+        -> cuDNN : CUDA 위에서 동작하는 라이브러리로, 합성곱 계층 등 딥러닝에 최적화된 고속 연산을 제공
+
+    - 분산 학습
+      - 딥러닝 학습에는 오랜 시간이 걸림 -> 학습을 여러 개의 GPU와 여러 대의 컴퓨터로 분산하여 학습 시간을 단축하려는 시도 = 분산 학습
+      - 계산 자체를 나누는 것뿐 아니라, GPU/컴퓨터 사이의 통신과 데이터 동기화 방법 등을 고려해야 하므로 난이도가 높음
+      - 구글의 텐서플로(TensorFlow), 마이크로소프트의 CNTK 등 딥러닝 프레임워크들은 분산 학습에 역점을 두고 개발됨
+        -> 대규모 데이터센터의 컴퓨팅 자원을 활용해 학습을 고속화
+      - 텐서플로의 분산 학습 성능 : 다수의 GPU와 컴퓨터를 사용할수록 학습 속도가 (거의) 선형적으로 빨라지는 결과가 보고됨
+
+    - 연산 정밀도와 비트 줄이기
+      - 계산 능력 외에도 메모리 용량, 버스 대역폭 등이 딥러닝 고속화의 병목이 될 수 있음
+        -> 메모리 용량 측면 : 대량의 가중치 매개변수와 중간 데이터를 메모리에 저장해야 함
+        -> 버스 대역폭 측면 : GPU(혹은 CPU)의 계산 능력을 활용하려면 버스를 흐르는 데이터양이 많아지는데, 이 데이터양이 병목이 되지 않도록 주의해야 함
+        -> 이런 관점에서는 네트워크(계층)에서 주고받는 데이터의 비트 수를 최소로 만드는 것이 바람직함
+      - 딥러닝은 높은 수치 정밀도(64비트 double, 32비트 float 등)를 요구하지 않는 것으로 알려져 있음
+        -> 신경망의 강건성(robustness) : 입력 데이터에 다소 노이즈가 섞여 있어도 출력 결과가 잘 달라지지 않는 성질에 기인
+      - 지금까지의 실험 결과, 계산 정밀도를 낮춰도(비트 수를 줄여도) 딥러닝의 인식 정확도가 크게 떨어지지 않음이 확인됨
+        -> 16비트 반정밀도(half-precision)만 사용해도 학습에 문제가 없다고 알려짐 (예 : 엔비디아 파스칼 아키텍처는 반정밀도 연산 지원)
+      - 비트 수를 극단적으로 줄이는 연구도 진행 중
+        -> 예 : 가중치와 중간 데이터를 1비트로 표현하는 Binarized Neural Networks 같은 방법도 등장
+
+  - 딥러닝의 활용
+    - 사물 검출
+      - 사물 검출(object detection) : 이미지 속에 담긴 사물의 위치와 종류(클래스)를 알아내는 기술
+      - 사물 인식(이미지 분류)보다 어려운 문제
+        -> 이미지 속에 여러 개의 사물이 있을 수 있고, 사물 각각의 위치까지 알아내야 함
+      - R-CNN(Regions with Convolutional Neural Network)
+        -> 사물 검출을 수행하는 대표적인 방법 중 하나
+        -> 처리 흐름 : (1) 입력 이미지 -> (2) 후보 영역 추출(Region Proposal) -> (3) CNN 특징 계산 -> (4) 영역 분류
+        -> 후보 영역 추출(사물이 있을 법한 영역을 찾아내는 작업)에는 Selective Search 같은, 컴퓨터 비전 분야에서 발전해온 기법을 사용
+        -> R-CNN 이후, 이 후보 영역 추출까지도 CNN으로 처리하는 Faster R-CNN 기법이 등장 -> 후보 영역 추출부터 분류까지 하나의 신경망으로 처리해 더 빠르게 처리 가능
+
+    - 분할(Segmentation)
+      - 분할(segmentation) : 이미지를 픽셀 수준에서 분류하는 문제
+        -> 픽셀 단위로 객체마다의 클래스를 나눈 지도(supervised) 데이터를 사용해 학습하고, 추론 시 입력 이미지의 모든 픽셀을 분류
+      - 신경망으로 분할을 수행하는 가장 단순한 방법 : 모든 픽셀 각각을 대상으로 추론(forward)을 수행하는 것
+        -> 픽셀 수만큼 forward 처리를 반복해야 해서 매우 오래 걸림
+        -> 원래 합성곱 연산에서 이미 계산했던 슬라이딩(필터 적용) 결과를 재사용하지 않아 낭비가 심함
+      - 이 낭비를 줄여주는 기법 : FCN(Fully Convolutional Network)
+        -> 완전연결 계층을 사용하지 않고 합성곱 계층만으로 구성한 네트워크
+        -> 일반적인 CNN은 완전연결 계층에서 중간 데이터의 공간 볼륨을 1차원 벡터로 변환(위치 정보를 뭉개어 통짜 노드로 처리)
+        -> 이와 달리 FCN은 마지막까지 공간 볼륨(위치 정보)을 유지한 채로 처리를 마침 -> 픽셀별 위치 정보를 유지하면서 한 번의 forward로 전체 픽셀을 분류 가능
+      - FCN에서 특히 주목할 부분 : 마지막에 공간 크기를 확대하는 처리를 도입한 점
+        -> 이중 선형 보간(bilinear interpolation)에 의한 선형 확대 방식을 사용
+        -> FCN에서는 이 선형 확대를 역합성곱(deconvolution) 연산으로 구현
+
+    - 사진 캡션 생성
+      - 사진 캡션 생성(image captioning) : 사진이 주어지면 그 사진을 설명하는 글(캡션)을 자동으로 생성하는 연구
+      - NIC(Neural Image Caption) 모델
+        -> 사진 캡션을 생성하는 대표적인 딥러닝 방법 중 하나
+        -> 심층 CNN과, 자연어를 다루는 RNN(Recurrent Neural Network, 순환 신경망)으로 구성
+        -> CNN으로 사진에서 특징을 추출하고, 그 특징을 RNN에 넘김 -> RNN은 CNN이 추출한 특징을 초깃값으로 삼아 텍스트를(문장을) 순환적으로 생성
+      - 멀티모달 처리(multimodal processing)
+        -> 사진(이미지)과 자연어(텍스트)처럼 여러 종류의 정보를 조합하고 처리하는 것을 일컬음
+        -> 최근 주목받는 딥러닝 응용 분야 중 하나
+
+부록. Softmax-with-Loss 계층의 계산 그래프
+  - 배경
+    - 5장(오차역전파법)에서는 Softmax-with-Loss 계층의 역전파 결과가 (y1-t1, y2-t2, y3-t3)처럼 말끔하게 나온다는 사실만 이용하고, 그 유도 과정은 다루지 않았음
+    - 부록에서는 계산 그래프를 이용해 Softmax 계층과 Cross Entropy Error 계층을 노드 단위로 쪼개어, 왜 최종 역전파 결과가 "출력 - 정답 레이블(y-t)"이라는 단순한 형태로 정리되는지 직접 유도함
+
+  - 계산 그래프로 순전파 표현하기
+    - Softmax 계층 (입력 a1, a2, a3 -> 출력 y1, y2, y3)
+      - exp 노드 : exp(a1), exp(a2), exp(a3) 계산
+      - sum 노드 : S = exp(a1) + exp(a2) + exp(a3)
+      - "1/x" 노드(역수) : S를 입력받아 1/S 출력
+      - mul 노드 : exp(ak) 와 1/S를 곱해 yk = exp(ak)/S 출력 (k = 1, 2, 3)
+    - Cross Entropy Error 계층 (입력 y1, y2, y3와 정답 레이블 t1, t2, t3 -> 출력 손실 L)
+      - log 노드 : log(yk) 계산
+      - mul 노드 : tk와 log(yk)를 곱함
+      - sum 노드 : t1*log(y1) + t2*log(y2) + t3*log(y3) 을 모두 더함
+      - "x(-1)" 노드 : 합계에 -1을 곱해 L = -sum(tk * log(yk)) 출력
+
+  - 계산 그래프로 역전파 유도하기
+    - 역전파는 최종 출력 L에서 흘러들어오는 기울기 1(dL/dL = 1)에서 시작해, 각 노드를 거꾸로 통과시키며 국소적 미분을 곱해나감
+    - Cross Entropy Error 계층 역전파
+      - "x(-1)" 노드 : 상류 값(1)에 -1을 곱함 -> -1
+      - sum 노드 : 덧셈 노드의 역전파는 상류 값을 그대로(분배해서) 흘려보냄 -> 각 tk*log(yk) 갈래로 -1이 그대로 전달
+      - mul 노드(tk * log(yk)) : 곱셈 노드의 역전파는 순전파 때의 "다른 입력"을 상류 값에 곱함 -> log(yk) 쪽으로 흘러가는 기울기 = -1 * tk = -tk
+      - log 노드 : log(x)의 미분은 1/x -> yk로 흘러가는 기울기 = -tk * (1/yk) = -tk/yk
+      - 즉, Cross Entropy Error 계층을 통과한 결과, Softmax 계층 출력 yk에는 기울기 -tk/yk 가 흘러들어감
+    - Softmax 계층 역전파
+      - mul 노드(yk = exp(ak) * (1/S)) : 상류 기울기 -tk/yk가 두 갈래로 갈라짐
+        -> exp(ak) 쪽(직접 경로) : (-tk/yk) * (1/S)
+        -> 1/S 쪽(공유 경로, k=1,2,3 세 갈래에서 흘러들어온 값을 모두 더함) : sum_k [ (-tk/yk) * exp(ak) ] = sum_k [ -tk * S ] = -S * sum_k(tk) = -S (정답 레이블 t는 원-핫이라 sum_k(tk) = 1이기 때문)
+      - "1/x" 노드(1/S) : x의 역수의 미분은 -1/x^2 -> S로 흘러가는 기울기 = (-S) * (-1/S^2) = 1/S
+      - sum 노드(S = exp(a1)+exp(a2)+exp(a3)) : 덧셈 노드는 상류 값(1/S)을 그대로 각 exp(ak) 갈래로 분배(복제)
+      - exp(ak) 노드에는 이렇게 두 경로의 기울기가 합쳐짐
+        -> 직접 경로 : (-tk/yk) * (1/S)
+        -> 공유 경로(합) : 1/S
+        -> 합계 : (1/S) * (1 - tk/yk)
+      - exp 노드 : exp(x)의 미분은 exp(x) 자기 자신 -> ak로 흘러가는 최종 기울기 = [(1/S) * (1 - tk/yk)] * exp(ak)
+        -> exp(ak) = yk * S 를 대입해 정리하면 : yk * (1 - tk/yk) = yk - tk
+      - 결론 : da_k = yk - tk  (5장에서 그냥 가져다 쓴 "y-t" 형태가 계산 그래프를 노드 단위로 끝까지 따라가면 정확히 유도됨)
+
+  - 정리
+    - Softmax-with-Loss 계층의 역전파가 (y1-t1, y2-t2, y3-t3)처럼 말끔한 형태가 되는 것은 우연이 아니라, exp/sum/(1/x)/mul/log/x(-1) 노드들의 국소적 미분이 정확히 상쇄·정리되면서 나오는 결과
+      - 구현 (계산 그래프 노드를 하나씩 구현해 순전파/역전파를 직접 재현)
+        class ExpNode:
+            def forward(self, x):
+                self.y = np.exp(x)
+                return self.y
+            def backward(self, dout):
+                return dout * self.y
+
+        class SumNode:
+            def forward(self, x):
+                self.x = x
+                return np.sum(x)
+            def backward(self, dout):
+                return dout * np.ones_like(self.x)
+
+        class ReciprocalNode:  # "1/x" 노드
+            def forward(self, x):
+                self.x = x
+                return 1.0 / x
+            def backward(self, dout):
+                return dout * (-1.0 / (self.x ** 2))
+
+        class MulNode:
+            def forward(self, x, y):
+                self.x, self.y = x, y
+                return x * y
+            def backward(self, dout):
+                return dout * self.y, dout * self.x
+
+        class LogNode:
+            def forward(self, x):
+                self.x = x
+                return np.log(x)
+            def backward(self, dout):
+                return dout * (1.0 / self.x)
+    - 이렇게 노드 단위로 구현한 역전파 결과(da)를 (y-t) 단순화 공식, 그리고 수치 미분(기울기 확인)과 비교해 세 값이 모두 일치함을 실습으로 확인 (appendix/softmax_loss_graph.py)
