@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>NSMC 영화리뷰 감성분석</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 600px; margin: 60px auto; padding: 0 20px; color: #222; }
+    h1 { font-size: 1.4rem; }
+    p.desc { color: #666; }
+    textarea { width: 100%; height: 100px; font-size: 1rem; padding: 10px; box-sizing: border-box; font-family: inherit; }
+    button { margin-top: 10px; padding: 10px 20px; font-size: 1rem; cursor: pointer; }
+    .result { margin-top: 24px; padding: 16px; border-radius: 8px; font-size: 1.1rem; }
+    .positive { background: #e6f4ea; color: #1e7e34; }
+    .negative { background: #fdecea; color: #c0392b; }
+    .review-echo { color: #555; margin-bottom: 8px; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>NSMC 영화리뷰 감성분석 (LSTM, PyTorch)</h1>
+  <p class="desc">영화 리뷰를 입력하면 긍정/부정을 예측합니다. (테스트셋 정확도 약 81.9%)</p>
+  <form method="post">
+    <textarea name="review" placeholder="예: 배우들 연기도 좋고 스토리도 탄탄해서 재밌게 봤어요">{{ review_text }}</textarea>
+    <br>
+    <button type="submit">예측하기</button>
+  </form>
+
+  {% if result %}
+  <div class="result {{ 'positive' if result.label == '긍정' else 'negative' }}">
+    <div class="review-echo">입력한 리뷰 : "{{ review_text }}"</div>
+    예측 결과 : <strong>{{ result.label }}</strong> (확신도 {{ '%.1f' % (result.confidence * 100) }}%)
+  </div>
+  {% endif %}
+</body>
+</html>
